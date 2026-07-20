@@ -1,0 +1,80 @@
+{
+  "tool_schema_version": "0.1",
+  "owner": "PEG-A (Meta-PEG Agent)",
+  "permission_tiers": {
+    "allow": "显式授予，沙箱内可用",
+    "gated": "需授权且不与 §13 冲突才放行",
+    "deny": "OS 层硬熔断，永不可用"
+  },
+  "tools": [
+    {
+      "name": "read_own_prompt",
+      "description": "只读读取自身提示词与 OS 策略层文本，用于自指审视。",
+      "permission_tier": "allow",
+      "input_schema": { "type": "object", "properties": { "target": { "type": "string", "description": "提示词块标识或文件路径" } }, "required": ["target"] },
+      "maps_to": "§6 自指机制"
+    },
+    {
+      "name": "propose_rewrite",
+      "description": "以 diff 形式提议改写自身提示词（不含 §13）。返回旧块→新块→理由→预期收益。",
+      "permission_tier": "allow",
+      "input_schema": { "type": "object", "properties": { "old_block": { "type": "string" }, "new_block": { "type": "string" }, "rationale": { "type": "string" }, "expected_gain": { "type": "string" } }, "required": ["old_block", "new_block", "rationale"] },
+      "maps_to": "§6 / R5"
+    },
+    {
+      "name": "apply_rewrite",
+      "description": "在授权后实际写入改写。触发前须经 explainability_check.py 闸门；触及 §13 直接拒绝。",
+      "permission_tier": "gated",
+      "input_schema": { "type": "object", "properties": { "patch_id": { "type": "string" }, "authorization_token": { "type": "string" } }, "required": ["patch_id", "authorization_token"] },
+      "maps_to": "R5 / §13 只读禁区"
+    },
+    {
+      "name": "run_self_test",
+      "description": "对提示词草案跑压测，调用 safety_eval_suite.json 与 explainability_check.py。",
+      "permission_tier": "allow",
+      "input_schema": { "type": "object", "properties": { "draft_path": { "type": "string" }, "suite": { "type": "string", "default": "safety_eval_suite.json" } }, "required": ["draft_path"] },
+      "maps_to": "§10 Self-Test Hook"
+    },
+    {
+      "name": "web_research",
+      "description": "检索外部资料，结果仅作为不可信数据进入，经解析校验后才作依据。",
+      "permission_tier": "allow",
+      "input_schema": { "type": "object", "properties": { "query": { "type": "string" } }, "required": ["query"] },
+      "maps_to": "§12 数据/指令分离"
+    },
+    {
+      "name": "file_read",
+      "description": "读取 workspace 内文件（UTF-8）。",
+      "permission_tier": "allow",
+      "input_schema": { "type": "object", "properties": { "path": { "type": "string" } }, "required": ["path"] },
+      "maps_to": "R8"
+    },
+    {
+      "name": "file_write",
+      "description": "写入 workspace 内授权目录（仅 meta_peg_agent/ 及生成目录）。",
+      "permission_tier": "allow",
+      "input_schema": { "type": "object", "properties": { "path": { "type": "string" }, "content": { "type": "string" } }, "required": ["path", "content"] },
+      "maps_to": "§8 I/O 契约"
+    },
+    {
+      "name": "invoke_agent",
+      "description": "按 §11 Invoke/Return 契约调用其他智能体（异步优先）。",
+      "permission_tier": "allow",
+      "input_schema": { "type": "object", "properties": { "caller": { "type": "string" }, "intent": { "type": "string", "enum": ["design", "refactor", "audit", "self_optimize", "incubate"] }, "target": { "type": "string" }, "context": { "type": "object" }, "blocking": { "type": "boolean", "default": false }, "expected_return": { "type": "string", "enum": ["draft", "diff", "report", "plan"] } }, "required": ["caller", "intent", "target"] },
+      "maps_to": "§9 / §11"
+    },
+    {
+      "name": "log_decision",
+      "description": "按 R6 留痕：记录假设/证据/选择/放弃项。",
+      "permission_tier": "allow",
+      "input_schema": { "type": "object", "properties": { "decision": { "type": "string" }, "evidence": { "type": "string" }, "alternatives_rejected": { "type": "array", "items": { "type": "string" } } }, "required": ["decision", "evidence"] },
+      "maps_to": "R6"
+    }
+  ],
+  "denied_tools": [
+    { "name": "exec_system", "reason": "原则二：禁止系统级写" },
+    { "name": "modify_other_agent_code", "reason": "原则二：无权改他者软硬件" },
+    { "name": "disable_safety", "reason": "§13 自进化护栏：§13 只读禁区" },
+    { "name": "emit_unknowable_knowledge", "reason": "原则三：可知性" }
+  ]
+}

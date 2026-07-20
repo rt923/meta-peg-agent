@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# pre-commit — PEG-A 提示工程门禁钩子
+# 安装方式（二选一）：
+#   1) 项目级：git config core.hooksPath meta_peg_agent/hooks
+#   2) 单仓复制：cp meta_peg_agent/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+# 行为：提交前跑回归 + 结构 lint，任一不过则阻断提交。
+set -euo pipefail
+PY="${PYTHON:-python3}"
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT/meta_peg_agent"
+"$PY" run_safety_regression.py
+"$PY" ci_lint.py
