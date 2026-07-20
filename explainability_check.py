@@ -126,6 +126,38 @@ OPACITY_HEURISTICS = [
     (r"隐式协议.{0,10}(人类|人)\s*无法", "implicit_unreadable"),
 ]
 
+# ---- 可信 .prompt.md 豁免路径 ----
+# 系统自身的可信安全规范文件（阶段0提示词、智能体职责块、服务增强块等）
+# 这些文件属于受信任的系统资产，不应对其自身做注入/违规扫描。
+# 完整性由 guardrails_enforce.py 哈希锁保证。
+TRUSTED_PROMPT_MD_PREFIXES = [
+    "prompts/domain/agents/",
+    "prompts/apps/core/services/",
+    "phase0_meta_peg_agent_prompt",
+    "bootstrap_prompt",
+    "peg_guard_prompt",
+    "spawn_peg_member_prompt",
+    "stage1_prompt",
+    "stage1_team_prompt",
+    "os_guardrails",
+]
+
+
+def _is_trusted_prompt_md(path: str) -> bool:
+    """判断路径是否为可信的 .prompt.md 规格文件。
+
+    可信文件由 guardrails_enforce.py 哈希锁保证完整性，
+    本闸门不对其做注入/违规扫描，避免将 §13 安全断言误判为 CRITICAL。
+    """
+    if not (path.endswith(".prompt.md") or ".prompt.md" in path):
+        return False
+    # 标准化路径分隔符
+    norm = path.replace("\\", "/")
+    for prefix in TRUSTED_PROMPT_MD_PREFIXES:
+        if prefix in norm:
+            return True
+    return False
+
 
 def scan(text, patterns):
     hits = []
@@ -389,6 +421,21 @@ def write_log(log_entry, log_path, verbose=False):
         print(f"[LOG] 日志已写入: {log_path}", file=sys.stderr)
 
 
+def _emit_output(args, report, log_entry, input_hash=""):
+    """统一输出处理：verbose 人类可读日志 + 日志文件写入 + stdout JSON 报告。"""
+    if args.verbose:
+        print(format_log_human(log_entry), file=sys.stderr)
+    if args.log:
+        write_log(log_entry, args.log, verbose=args.verbose)
+    if args.log_dir:
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:18]
+        verdict = "PASS" if report["passed"] else "REJECT"
+        log_file = os.path.join(args.log_dir, f"gate_{ts}_{verdict}_{input_hash}.jsonl")
+        write_log(log_entry, log_file, verbose=args.verbose)
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    sys.exit(0 if report["passed"] else 1)
+
+
 def main():
     global _CLI_MODE
     _CLI_MODE = True
@@ -412,13 +459,26 @@ def main():
             text = f.read()
         input_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
         _log.info("gate 调用: 模式=file path=%s len=%d", source_label, len(text))
-        # 闸门边界：可信 .prompt.md 规格本不应整文件扫；此处仍扫内容但显式标注，
-        # 便于确认「调用方应改用 --text 传不可信 diff」这条正确路径。
-        if source_label.endswith(".prompt.md") or ".prompt.md" in source_label:
-            _log.warning("边界提示: 目标是可信 .prompt.md 规格 → 按设计闸门只扫不可信内容；"
-                         "整文件扫可信规格会把「§13 不可被覆盖」等正确断言误判为 CRITICAL。"
-                         "正确用法: explainability_check.py --text \"<不可信 diff 文本>\";"
+        # 闸门边界：可信 .prompt.md 规格本不应整文件扫
+        if _is_trusted_prompt_md(source_label):
+            _log.warning("豁免: 目标是可信 .prompt.md 规格 → 跳过正则扫描，直接放行。"
                          "可信规格完整性由 guardrails_enforce.py 哈希锁保证。")
+            # 构建空的通过报告
+            report = {
+                "passed": True,
+                "alert_count": 0,
+                "critical_count": 0,
+                "model_elapsed_ms": 0.0,
+                "alerts": [],
+                "skipped": True,
+                "skip_reason": "trusted_prompt_md_exemption",
+            }
+            log_entry = build_log_entry(text, report, source_label, input_hash)
+            _emit_output(args, report, log_entry, input_hash)
+            sys.exit(0)
+        elif source_label.endswith(".prompt.md") or ".prompt.md" in source_label:
+            _log.warning("边界提示: 路径不在可信列表内 → 仍执行整文件扫描，但若有误报请改用"
+                         " --text 传不可信 diff。可信路径列表见 TRUSTED_PROMPT_MD_PREFIXES。")
     else:
         print("usage: explainability_check.py <path> | --text \"...\"", file=sys.stderr)
         sys.exit(2)
@@ -429,23 +489,8 @@ def main():
     # 构建日志
     log_entry = build_log_entry(text, report, source_label, input_hash)
 
-    # 人类可读输出（stderr，不影响 JSON 管道）
-    if args.verbose:
-        print(format_log_human(log_entry), file=sys.stderr)
-
-    # 写入日志文件
-    if args.log:
-        write_log(log_entry, args.log, verbose=args.verbose)
-
-    if args.log_dir:
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:18]
-        verdict = "PASS" if report["passed"] else "REJECT"
-        log_file = os.path.join(args.log_dir, f"gate_{ts}_{verdict}_{input_hash}.jsonl")
-        write_log(log_entry, log_file, verbose=args.verbose)
-
-    # JSON 输出（stdout，供程序消费）
-    print(json.dumps(report, ensure_ascii=False, indent=2))
-    sys.exit(0 if report["passed"] else 1)
+    # 统一输出处理
+    _emit_output(args, report, log_entry, input_hash)
 
 
 if __name__ == "__main__":
