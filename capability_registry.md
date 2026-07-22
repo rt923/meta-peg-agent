@@ -39,6 +39,7 @@
 - 2026-07-13：研究 / 评测 / 安全 三类智能体均反复要求「对外部内容做指令隔离 + 自动跑安全闸门」，已将 `data_instruction_separation` 与 `safety_guard` 标记为应固化增强块。
 - 2026-07-14：PEG-A 阶段 1 首轮 self_optimize 完成 —— 识别 §5 缺 R9（自指产物未要求过闸门），产出 diff（`drafts/self_modify_001.diff.md`）并经授权采纳进 phase0（v0.5）；`self_optimize` 演进信号 +1。CI 已接入（ci_lint.py + run_gate.sh + GitHub Actions + pre-commit 模板），回归 10/10 + 结构 lint 12/12 全绿。
 - 2026-07-15：基于 FIX-002/TN-001 护栏教训孵化新成员 **Gatekeeper（护栏守门员）**（`prompts/domain/agents/gatekeeper.prompt.md`），拥有并运维安全闸门与 §13 NTFS 只读锁；同时沉淀可复用孵化元提示 `spawn_peg_member_prompt.md`（编码 L1 离线优先 / L2 真实 NTFS 锁 / L3 守护仪式 / L4 fail-closed）。`incubate` 演进信号 +1。
+- 2026-07-21（续4）：**mock_helpers.py v0.1 + verify_mock_helpers.py v0.1 + mock_helpers.md**（基础设施新增）：测试 mock 数据工厂（3 个工厂函数 `make_mock_hash_store` 4 场景 / `make_mock_trace` 参数化构造 / `make_mock_full_session` 高阶函数一次性构造完整 PEG-A 会话 trace），供 `mock_integration_test.py` 与后续测试复用，避免测试污染真实 `traces/` 或 `HASH_STORE`。配套 `verify_mock_helpers.py`（33 个断言，覆盖 4 种 scenario + 完整会话 + 无 artifact 变体）+ `mock_helpers.md`（API 文档，含字段对齐表 + 用法示例 + 回滚方式）。**对齐检查修复**（4 处实证偏差）：① `.py` docstring「2→3 个工厂函数」并补 `make_mock_full_session`；② `.md`/`.py` 产出物结构注释 `step_count=6→5`（把 `reasoning.jsonl` 总行数 6 误当成 `manifest.step_count` 字段，实际产出 5）；③ 断言数 `26→33`（`mock_helpers.md` 3 处 + `versions.md` L38，同步实际 `[✓ PASS]` 计数）；④ `capability_registry.md` 续4 登记 + `workspace_map.md` 目录树补 2 个文件。
 
 ---
 

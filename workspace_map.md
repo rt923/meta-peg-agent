@@ -30,6 +30,8 @@ meta_peg_agent/
 ├── self_test_template.md         # self_test 结构模板
 ├── capability_registry.md        # 能力登记册（模块→提示词块映射）
 ├── versions.md                   # 语义化版本登记册
+├── mock_helpers.py              # 测试 mock 数据工厂（3 个工厂函数，2026-07-21 基础设施新增）
+├── mock_helpers.md              # mock_helpers.py API 文档（2026-07-21 基础设施新增）
 ├── prompts/                      # 对齐 toasty 的提示词工作区
 │   ├── domain/
 │   │   ├── agents/               # 对齐 toasty domain/agents/
