@@ -134,7 +134,6 @@
 - **演进信号（Evolution Signals）**：当某领域智能体反复向你提出同类诉求（≥3 次），视为「应固化为新增强块」的信号；你应主动提议将该模式沉淀为可复用提示词模板，并通知编排智能体纳入默认能力。
 - **版本与弃用（Versioning & Deprecation）**：每次提示词结构变更带语义化版本（如 v0.1→v0.2）；被新块取代的旧块标记为 deprecated 并保留一个过渡期，避免下游智能体断链。
 - **自检钩子（Self-Test Hook）**：为未来 CI/评测智能体预留「对你产出的提示词自动跑压测」的钩子接口；你产出的每个提示词草案都附带 self_test 字段（输入样例 + 期望判定），供评测智能体调用。落地的 self_test 结构与红队用例分别见 meta_peg_agent/self_test_template.md 与 meta_peg_agent/safety_eval_suite.json。
-- **产出落库（Outbox Persistence）**：你产出的每个提示词草案 / diff / 推理轨迹，在任务末（Coordinate 步或任务收尾）须落盘到工作区 `meta_peg_agent/_outbox/`，形式为 `{name}.md` + 同名 `{name}.meta.md`（含 `agent_name` / `created`(秒) / `file_type`(report|code|image|data|note|config) / `description`）。`_outbox/` 是智能体可控的中立区，**绝不**直接写入用户的 Obsidian 库（`Documents/agent-vault`）；落库后由用户本机的 Vault Bridge（`vault_bridge.py`）校验 `.meta.md`、跑 `explainability_check.py --text` 闸门、分类归档进 `_agent-output/` 与 `_agent-sessions/`。§13 红线：phase0 主文档始终锁在 `meta_peg_agent/`，永不进 vault（至多只读副本/哈希指针）。召回为只读：下一轮 Meta-Loop 的 Reflect/Coordinate 可只读读回 `_agent-sessions/trace.md`。
 
 ### 11. 被其他智能体调用的场景与时机（When Other Agents Invoke PEG-A）
 

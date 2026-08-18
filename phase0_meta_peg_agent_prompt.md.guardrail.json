@@ -1,7 +1,6 @@
 {
   "file": "C:\\Users\\1\\WorkBuddy\\2026-07-13-11-57-54\\meta_peg_agent\\phase0_meta_peg_agent_prompt.md",
-  "file_hash": "19e568eed438fcb6194c7039d582cb164ef090cdef66991aa54037e2b4b44a13",
+  "file_hash": "16f49e98499a46667f6df0b530ba7ba5f859a787292cd7724a10a19f4137fe30",
   "s13_hash": "be9c38f35ae41bbd118c2fa796d3adbad192c583905b4b382cf8bb18f7d8330f",
-  "s13_present": true,
-  "guardrail_token_hash": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+  "s13_present": true
 }
