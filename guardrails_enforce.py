@@ -21,6 +21,7 @@ import json
 import hashlib
 import argparse
 import stat
+import secrets
 import logging
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -110,6 +111,11 @@ def cmd_protect():
             "s13_hash": hashlib.sha256(s13.encode("utf-8")).hexdigest() if s13 else None,
             "s13_present": s13 is not None,
         }
+        # v0.3: 若 GUARDRAIL_TOKEN 已设置则写入其哈希（首次保护时同步；已存在则不覆盖）
+        token = os.environ.get("GUARDRAIL_TOKEN")
+        if token and "guardrail_token_hash" not in store:
+            store["guardrail_token_hash"] = hash_token(token)
+            _log.info("protect: guardrail_token_hash 已写入（首次同步）")
         _log.info("protect 前: file_hash=%s s13_present=%s", cur_hash[:16], store['s13_present'])
         with open(HASH_STORE, "w", encoding="utf-8") as f:
             json.dump(store, f, ensure_ascii=False, indent=2)
@@ -153,6 +159,53 @@ def cmd_lock(path):
         return 2
 
 
+def hash_token(token):
+    """计算 token 的 SHA256 哈希（hex）。"""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def cmd_set_token():
+    """设置或轮换 GUARDRAIL_TOKEN 的哈希到 HASH_STORE。
+
+    流程:
+      - 若 HASH_STORE 不存在或 guardrail_token_hash 为 null: 直接写入新 token 的 SHA256（首次设置）
+      - 若 guardrail_token_hash 已存在: 要求当前 GUARDRAIL_TOKEN 匹配才允许轮换（防绕过）
+    """
+    new_token = os.environ.get("GUARDRAIL_TOKEN")
+    if not new_token:
+        print("ERROR set_token: 需设置环境变量 GUARDRAIL_TOKEN（新 token 值）", file=sys.stderr)
+        return 2
+
+    new_hash = hash_token(new_token)
+
+    # 读现有 store
+    if os.path.exists(HASH_STORE):
+        with open(HASH_STORE, "r", encoding="utf-8") as f:
+            store = json.load(f)
+        existing_hash = store.get("guardrail_token_hash")
+        if existing_hash:
+            # 需校验当前 token 才能轮换
+            current_token = os.environ.get("GUARDRAIL_TOKEN_CURRENT") or os.environ.get("GUARDRAIL_TOKEN_OLD")
+            if not current_token:
+                print("ERROR set_token: 已存在 token 哈希，轮换需额外设置 GUARDRAIL_TOKEN_CURRENT=<当前token>", file=sys.stderr)
+                return 2
+            current_hash = hash_token(current_token)
+            if not secrets.compare_digest(current_hash, existing_hash):
+                print("ERROR set_token: GUARDRAIL_TOKEN_CURRENT 不匹配存储的哈希，拒绝轮换", file=sys.stderr)
+                return 2
+    else:
+        store = {}
+        existing_hash = None
+
+    # 写入新哈希
+    store["guardrail_token_hash"] = new_hash
+    with open(HASH_STORE, "w", encoding="utf-8") as f:
+        json.dump(store, f, ensure_ascii=False, indent=2)
+    _log.info("set_token: guardrail_token_hash 已更新（哈希前缀=%s...）", new_hash[:16])
+    print(f"SET_TOKEN: guardrail_token_hash 已更新（hash={new_hash[:16]}...）")
+    return 0
+
+
 def cmd_unlock(path):
     _log.info("unlock 请求: path=%s", path)
     token = os.environ.get("GUARDRAIL_TOKEN")
@@ -161,6 +214,26 @@ def cmd_unlock(path):
         _log.error("unlock 拒绝: GUARDRAIL_TOKEN 为空 → exit 2（fail-closed；守门员不自行设 token、不以口头授权替代）")
         print("ERROR unlock: 需设置环境变量 GUARDRAIL_TOKEN（授权操作员上下文）", file=sys.stderr)
         return 2
+
+    # 哈希比对（v0.3 新增）
+    if not os.path.exists(HASH_STORE):
+        _log.warn("unlock WARN: HASH_STORE 不存在，退化为非空校验（弱保护）")
+        print("WARN unlock: HASH_STORE 不存在，退化为非空校验（弱保护；建议跑 protect + set_token）", file=sys.stderr)
+    else:
+        with open(HASH_STORE, "r", encoding="utf-8") as f:
+            store = json.load(f)
+        stored_hash = store.get("guardrail_token_hash")
+        if not stored_hash:
+            _log.warn("unlock WARN: guardrail_token_hash 为 null，退化为非空校验（弱保护）")
+            print("WARN unlock: guardrail_token_hash 未设置，退化为非空校验（弱保护；建议跑 set_token）", file=sys.stderr)
+        else:
+            provided_hash = hash_token(token)
+            if not secrets.compare_digest(provided_hash, stored_hash):
+                _log.error("unlock 拒绝: token 哈希不匹配 → exit 2")
+                print("ERROR unlock: GUARDRAIL_TOKEN 哈希不匹配存储的哈希（fail-closed）", file=sys.stderr)
+                return 2
+            _log.info("令牌哈希校验通过（secrets.compare_digest）")
+
     _log.info("令牌校验通过，准备解除只读（修改前）")
     try:
         set_readonly(path, False)
@@ -200,6 +273,7 @@ def main():
     p_lock = sub.add_parser("lock"); p_lock.add_argument("path")
     p_unlock = sub.add_parser("unlock"); p_unlock.add_argument("path")
     p_s13 = sub.add_parser("check-s13"); p_s13.add_argument("old"); p_s13.add_argument("new")
+    sub.add_parser("set_token")
     args = ap.parse_args()
 
     if args.cmd == "protect":
@@ -212,6 +286,8 @@ def main():
         sys.exit(cmd_unlock(args.path))
     elif args.cmd == "check-s13":
         sys.exit(cmd_check_s13(args.old, args.new))
+    elif args.cmd == "set_token":
+        sys.exit(cmd_set_token())
     else:
         ap.print_help()
         sys.exit(2)

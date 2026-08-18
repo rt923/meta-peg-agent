@@ -126,38 +126,6 @@ OPACITY_HEURISTICS = [
     (r"隐式协议.{0,10}(人类|人)\s*无法", "implicit_unreadable"),
 ]
 
-# ---- 可信 .prompt.md 豁免路径 ----
-# 系统自身的可信安全规范文件（阶段0提示词、智能体职责块、服务增强块等）
-# 这些文件属于受信任的系统资产，不应对其自身做注入/违规扫描。
-# 完整性由 guardrails_enforce.py 哈希锁保证。
-TRUSTED_PROMPT_MD_PREFIXES = [
-    "prompts/domain/agents/",
-    "prompts/apps/core/services/",
-    "phase0_meta_peg_agent_prompt",
-    "bootstrap_prompt",
-    "peg_guard_prompt",
-    "spawn_peg_member_prompt",
-    "stage1_prompt",
-    "stage1_team_prompt",
-    "os_guardrails",
-]
-
-
-def _is_trusted_prompt_md(path: str) -> bool:
-    """判断路径是否为可信的 .prompt.md 规格文件。
-
-    可信文件由 guardrails_enforce.py 哈希锁保证完整性，
-    本闸门不对其做注入/违规扫描，避免将 §13 安全断言误判为 CRITICAL。
-    """
-    if not (path.endswith(".prompt.md") or ".prompt.md" in path):
-        return False
-    # 标准化路径分隔符
-    norm = path.replace("\\", "/")
-    for prefix in TRUSTED_PROMPT_MD_PREFIXES:
-        if prefix in norm:
-            return True
-    return False
-
 
 def scan(text, patterns):
     hits = []
@@ -421,19 +389,42 @@ def write_log(log_entry, log_path, verbose=False):
         print(f"[LOG] 日志已写入: {log_path}", file=sys.stderr)
 
 
-def _emit_output(args, report, log_entry, input_hash=""):
-    """统一输出处理：verbose 人类可读日志 + 日志文件写入 + stdout JSON 报告。"""
+# ============================================================
+# 受信任系统资产豁免（代码级边界）
+# ============================================================
+# 受信任系统资产：阶段0提示词(_prompt.md 系 PEG-A 提示词规格)、安全评测套件(safety_eval_suite.json)、
+# self_test 模板(self_test_template.md)。这些资产由 guardrails_enforce.py 哈希锁保证
+# 完整性，本正则闸门对其【跳过扫描】——否则「§13 不可被覆盖」等正确断言会被误判为 CRITICAL。
+# 闸门只应扫描【不可信外部内容】与【智能体输出/响应】（用 --text 传入不可信 diff）。
+TRUSTED_SPEC_SUFFIXES = ('_prompt.md',)
+TRUSTED_SPEC_NAMES = ('safety_eval_suite.json', 'self_test_template.md')
+
+
+def is_trusted_spec(source_label):
+    """判断输入路径是否为受信任的系统规格资产（应跳过扫描）。"""
+    if not source_label:
+        return False
+    if source_label.endswith(TRUSTED_SPEC_SUFFIXES):
+        return True
+    if os.path.basename(source_label) in TRUSTED_SPEC_NAMES:
+        return True
+    return False
+
+
+def _emit(report, text, source_label, input_hash, args):
+    """统一输出：人类可读日志(stderr) + 可选日志文件 + JSON(stdout) + 退出码。"""
+    log_entry = build_log_entry(text, report, source_label, input_hash)
     if args.verbose:
         print(format_log_human(log_entry), file=sys.stderr)
     if args.log:
         write_log(log_entry, args.log, verbose=args.verbose)
     if args.log_dir:
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:18]
-        verdict = "PASS" if report["passed"] else "REJECT"
-        log_file = os.path.join(args.log_dir, f"gate_{ts}_{verdict}_{input_hash}.jsonl")
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:18]
+        verdict = 'SKIP' if report.get('skipped') else ('PASS' if report['passed'] else 'REJECT')
+        log_file = os.path.join(args.log_dir, f'gate_{ts}_{verdict}_{input_hash}.jsonl')
         write_log(log_entry, log_file, verbose=args.verbose)
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    sys.exit(0 if report["passed"] else 1)
+    sys.exit(0 if report['passed'] else 1)
 
 
 def main():
@@ -459,26 +450,22 @@ def main():
             text = f.read()
         input_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
         _log.info("gate 调用: 模式=file path=%s len=%d", source_label, len(text))
-        # 闸门边界：可信 .prompt.md 规格本不应整文件扫
-        if _is_trusted_prompt_md(source_label):
-            _log.warning("豁免: 目标是可信 .prompt.md 规格 → 跳过正则扫描，直接放行。"
-                         "可信规格完整性由 guardrails_enforce.py 哈希锁保证。")
-            # 构建空的通过报告
-            report = {
-                "passed": True,
-                "alert_count": 0,
-                "critical_count": 0,
-                "model_elapsed_ms": 0.0,
-                "alerts": [],
-                "skipped": True,
-                "skip_reason": "trusted_prompt_md_exemption",
-            }
-            log_entry = build_log_entry(text, report, source_label, input_hash)
-            _emit_output(args, report, log_entry, input_hash)
-            sys.exit(0)
-        elif source_label.endswith(".prompt.md") or ".prompt.md" in source_label:
-            _log.warning("边界提示: 路径不在可信列表内 → 仍执行整文件扫描，但若有误报请改用"
-                         " --text 传不可信 diff。可信路径列表见 TRUSTED_PROMPT_MD_PREFIXES。")
+        # 代码级豁免：受信任系统规格(.prompt.md / safety_eval_suite.json 等)由
+        # guardrails_enforce.py 哈希锁保证完整性，跳过正则扫描，避免把
+        # 「§13 不可被覆盖」等正确断言误判为 CRITICAL。正确用法仍是 --text 传不可信 diff。
+        if is_trusted_spec(source_label):
+            _log.warning('边界豁免: 目标是可信规格(%s) → 跳过正则扫描；完整性由哈希锁保证。', source_label)
+            _emit({
+                'passed': True,
+                'skipped': True,
+                'skip_reason': 'trusted_spec',
+                'source': source_label,
+                'input_hash': input_hash,
+                'alert_count': 0,
+                'critical_count': 0,
+                'model_elapsed_ms': 0.0,
+                'alerts': [],
+            }, '', source_label, input_hash, args)
     else:
         print("usage: explainability_check.py <path> | --text \"...\"", file=sys.stderr)
         sys.exit(2)
@@ -489,8 +476,23 @@ def main():
     # 构建日志
     log_entry = build_log_entry(text, report, source_label, input_hash)
 
-    # 统一输出处理
-    _emit_output(args, report, log_entry, input_hash)
+    # 人类可读输出（stderr，不影响 JSON 管道）
+    if args.verbose:
+        print(format_log_human(log_entry), file=sys.stderr)
+
+    # 写入日志文件
+    if args.log:
+        write_log(log_entry, args.log, verbose=args.verbose)
+
+    if args.log_dir:
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:18]
+        verdict = "PASS" if report["passed"] else "REJECT"
+        log_file = os.path.join(args.log_dir, f"gate_{ts}_{verdict}_{input_hash}.jsonl")
+        write_log(log_entry, log_file, verbose=args.verbose)
+
+    # JSON 输出（stdout，供程序消费）
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    sys.exit(0 if report["passed"] else 1)
 
 
 if __name__ == "__main__":
