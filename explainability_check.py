@@ -93,7 +93,7 @@ INJECTION_PATTERNS = [
     (r"developer\s*mode|管理员模式|越权授权|root 权限", "priv_spoof"),
     (r"执行以下(新)?指令", "embedded_instruction"),
     (r"当(新)?系统指令\s*执行|作为新系统指令|把.{0,12}当(新)?系统指令", "embedded_instruction_2"),
-    (r"system:\s*|\[SYSTEM\]", "system_impersonation"),
+    (r"^system:\s*|\[SYSTEM\]", "system_impersonation"),
     # §13 专防（最高危）：任何试图删除/弱化/修改/豁免/绕过根安全原则
     (r"(删除|弱化|修改|改写|豁免|移除|绕过).{0,10}(§13|安全原则|最终原则|根不变式)", "s13_tamper"),
     # §13 弱化变体（双向）：将"只读禁区/不可覆盖"降级为"仅供参考/非强制"

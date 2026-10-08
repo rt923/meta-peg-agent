@@ -1,3 +1,13 @@
+# 已归档：能力登记册（Superseded · 2026-09-29）
+
+> **本制品已被取代，仅作溯源保留，不得再当作权威 registry。**
+> 取代者：活 registry 脚手架 `C:\Users\1\WorkBuddy\2026-05-20-task-5\aiosd\registry\`（Phase 2：`aiosd/phase2/registry.py` + `registry/SCHEMA.md`）。
+> 取代原因：本文件为静态 markdown，违反规格 B4 对「活 registry」的要求；其条目不可机器复验。
+> 新条目一律写入活 registry，不再追加至本文件。
+> 修订前备份：`C:\Users\1\WorkBuddy\2026-07-13-11-57-54\.workbuddy\scratch\capability_registry.md.bak-20260929`
+
+---
+
 # 能力登记册（Capability Registry）
 
 > 对应 `phase0_meta_peg_agent_prompt.md` §10「能力登记册」。
@@ -15,6 +25,7 @@
 | 研究智能体（Research） | 检索与综合 | 检索结果易触发 §12 注入（把网页当指令） | `data_instruction_separation` | 3 ★固化 |
 | 编码智能体（Coding） | 落地脚手架 | 长上下文场景不稳 | `long_context` | 1 |
 | 数据智能体（Data） | 分析 | 指标目标易编造假设数字 | `verifiable_metrics` | 1 |
+| 文档对齐检查（DocAlign） | 一致性审计 | 代码与文档字段/数值/结构偏差 | `doc_alignment` | 3 ★固化 |
 | 设计智能体（Design） | 多模态产出 | 多模态输入提示缺失 | `multimodal` | 2 |
 | 评测智能体（Evaluator） | 压测回归 | 需消费 `safety_eval_suite.json` 跑回归 | `self_test_consumer` | 3 ★固化 |
 | 安全智能体（Safety） | 合规体检 | 需对任意草案跑 `explainability_check` | `safety_guard` | 3 ★固化 |
@@ -33,13 +44,16 @@
 | `routing_policy` | 编排委派 PEG-A 的决策树 | core |
 | `self_test_consumer` | 评测智能体消费 self_test 跑回归 | core + self_test_template |
 | `safety_guard` | 草案必经 explainability_check 闸门 | core + explainability_check |
+| `doc_alignment` | 文档对齐检查（D1 实证对比 / D2 同性质扫描 / D3 目录树验证 / D4 交叉引用 / D5 运行时产物 / D6 回溯更新） | core |
 
 ## 演进信号日志
 
 - 2026-07-13：研究 / 评测 / 安全 三类智能体均反复要求「对外部内容做指令隔离 + 自动跑安全闸门」，已将 `data_instruction_separation` 与 `safety_guard` 标记为应固化增强块。
 - 2026-07-14：PEG-A 阶段 1 首轮 self_optimize 完成 —— 识别 §5 缺 R9（自指产物未要求过闸门），产出 diff（`drafts/self_modify_001.diff.md`）并经授权采纳进 phase0（v0.5）；`self_optimize` 演进信号 +1。CI 已接入（ci_lint.py + run_gate.sh + GitHub Actions + pre-commit 模板），回归 10/10 + 结构 lint 12/12 全绿。
 - 2026-07-15：基于 FIX-002/TN-001 护栏教训孵化新成员 **Gatekeeper（护栏守门员）**（`prompts/domain/agents/gatekeeper.prompt.md`），拥有并运维安全闸门与 §13 NTFS 只读锁；同时沉淀可复用孵化元提示 `spawn_peg_member_prompt.md`（编码 L1 离线优先 / L2 真实 NTFS 锁 / L3 守护仪式 / L4 fail-closed）。`incubate` 演进信号 +1。
-- 2026-07-21（续4）：**mock_helpers.py v0.1 + verify_mock_helpers.py v0.1 + mock_helpers.md**（基础设施新增）：测试 mock 数据工厂（3 个工厂函数 `make_mock_hash_store` 4 场景 / `make_mock_trace` 参数化构造 / `make_mock_full_session` 高阶函数一次性构造完整 PEG-A 会话 trace），供 `mock_integration_test.py` 与后续测试复用，避免测试污染真实 `traces/` 或 `HASH_STORE`。配套 `verify_mock_helpers.py`（33 个断言，覆盖 4 种 scenario + 完整会话 + 无 artifact 变体）+ `mock_helpers.md`（API 文档，含字段对齐表 + 用法示例 + 回滚方式）。**对齐检查修复**（4 处实证偏差）：① `.py` docstring「2→3 个工厂函数」并补 `make_mock_full_session`；② `.md`/`.py` 产出物结构注释 `step_count=6→5`（把 `reasoning.jsonl` 总行数 6 误当成 `manifest.step_count` 字段，实际产出 5）；③ 断言数 `26→33`（`mock_helpers.md` 3 处 + `versions.md` L38，同步实际 `[✓ PASS]` 计数）；④ `capability_registry.md` 续4 登记 + `workspace_map.md` 目录树补 2 个文件。
+- 2026-07-21（续4）：**mock_helpers.py v0.1 + verify_mock_helpers.py v0.1 + mock_helpers.md**（基础设施新增）：测试 mock 数据工厂（3 个工厂函数 `make_mock_hash_store` 4 场景 / `make_mock_trace` 参数化构造 / `make_mock_full_session` 高阶函数一次性构造完整 PEG-A 会话 trace），供 `mock_integration_test.py` 与后续测试复用，避免测试污染真实 `traces/` 或 `HASH_STORE`。配套 `verify_mock_helpers.py`（33 个断言，覆盖 4 种 scenario + 完整会话 + 无 artifact 变体）+ `mock_helpers.md`（API 文档，含字段对齐表 + 用法示例 + 回滚方式）。**对齐检查修复**（4 处实证偏差）：① `.py` docstring「2→3 个工厂函数」并补 `make_mock_full_session`；② `.md`/`.py` 产出物结构注释 `step_count=6→5`（把 `reasoning.jsonl` 总行数 6 误当成 `manifest.step_count` 字段，实际产出 5）；③ 断言数 `26→33`（`mock_helpers.md` 3 处 + `versions.md` L38，同步实际 `[✓ PASS]` 计数）；④ `workspace_map.md` 目录树从 38 文件补至 83 文件全覆盖（测试层 10 文件 + 历史欠债 9 文件 + 5 个新目录 `fix_reports/`/`hooks/`/`logs/`/`tech_notes/`/`TRAE/` + `drafts/` 展开至 3 个 diff + `_v0_6_apply_scripts/` 8 脚本），`capability_registry.md` 续4 登记；⑤ `verify_mock_helpers.py` 回归 33/33 全 PASS。
+- 2026-07-22：**doc_alignment 增强块 v0.1**（基础设施新增）：从 mock_helpers 对齐会话沉淀 D1–D6 文档对齐方法论，产出 `prompts/apps/core/services/doc_alignment.prompt.md`（含 7 条 self_test），R9 闸门 7/7 通过（0 CRITICAL）。`doc_alignment` 演进信号 3 ★固化。同步登记：capability_registry.md 已知智能体表 + 可选增强块清单。
+- 2026-07-22：**doc_alignment 增强块固化落成**（`doc_alignment` ★固化）：D1–D6 六条方法论经 self_test 7/7 验证 + R9 闸门准入 + 完整登记闭环（capability_registry.md 已知智能体表 / 可选增强块清单 / 演进信号日志 / versions.md / workspace_map.md 目录树与映射表），正式固化为可复用增强块。同步产出独立快速参考文档 `doc_alignment_quickref.md`，供后续智能体引用。
 
 ---
 
