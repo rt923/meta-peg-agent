@@ -1,0 +1,8 @@
+[distutils]
+index-servers =
+    internal
+
+[internal]
+repository = https://artifactory.YOUR-COMPANY.com/artifactory/api/pypy/pypi-local
+username = YOUR_USERNAME
+password = YOUR_PASSWORD_OR_API_KEY

@@ -1,0 +1,95 @@
+{
+  "timestamp": "2026-07-28T18:25:13",
+  "python_version": "3.12.10",
+  "full_run": {
+    "ok": true,
+    "total_ms": 57.541
+  },
+  "micro_benchmarks": [
+    {
+      "label": "1. JSON 语法合法性",
+      "ok": true,
+      "elapsed_ms": 0.141,
+      "error": ""
+    },
+    {
+      "label": "2. 顶层字段完整性",
+      "ok": true,
+      "elapsed_ms": 0.002,
+      "error": ""
+    },
+    {
+      "label": "3. meta 字段 + 类型",
+      "ok": true,
+      "elapsed_ms": 0.003,
+      "error": ""
+    },
+    {
+      "label": "4. role 字段",
+      "ok": true,
+      "elapsed_ms": 0.001,
+      "error": ""
+    },
+    {
+      "label": "5. D1–D6 规则结构",
+      "ok": true,
+      "elapsed_ms": 0.008,
+      "error": ""
+    },
+    {
+      "label": "6. workflow 五步",
+      "ok": true,
+      "elapsed_ms": 0.003,
+      "error": ""
+    },
+    {
+      "label": "7. self_test 7 条",
+      "ok": true,
+      "elapsed_ms": 0.003,
+      "error": ""
+    },
+    {
+      "label": "8. security §12/§13",
+      "ok": true,
+      "elapsed_ms": 0.001,
+      "error": ""
+    },
+    {
+      "label": "9. related_files 路径",
+      "ok": true,
+      "elapsed_ms": 0.156,
+      "error": ""
+    },
+    {
+      "label": "10. 空值校验",
+      "ok": true,
+      "elapsed_ms": 0.028,
+      "error": ""
+    },
+    {
+      "label": "11. 数组非空",
+      "ok": true,
+      "elapsed_ms": 0.001,
+      "error": ""
+    }
+  ],
+  "micro_total_ms": 0.347,
+  "overhead_ms": 57.194,
+  "top_bottlenecks": [
+    {
+      "rank": 1,
+      "label": "9. related_files 路径",
+      "elapsed_ms": 0.156
+    },
+    {
+      "rank": 2,
+      "label": "1. JSON 语法合法性",
+      "elapsed_ms": 0.141
+    },
+    {
+      "rank": 3,
+      "label": "10. 空值校验",
+      "elapsed_ms": 0.028
+    }
+  ]
+}

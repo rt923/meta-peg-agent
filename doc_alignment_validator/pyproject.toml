@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=64.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "doc_alignment_validator"
+version = "0.1.0"
+description = "doc_alignment JSON 完整性校验工具（11 项检查）"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+]
+
+[project.scripts]
+doc-alignment-validate = "doc_alignment_validator.validate:main"
+
+[tool.setuptools.package-data]
+doc_alignment_validator = ["data/doc_alignment.json"]

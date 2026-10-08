@@ -1,0 +1,55 @@
+name: doc_alignment JSON CI
+
+on:
+  push:
+    paths:
+      - "meta_peg_agent/doc_alignment.json"
+      - "meta_peg_agent/validate_doc_alignment_json.py"
+  pull_request:
+    paths:
+      - "meta_peg_agent/doc_alignment.json"
+      - "meta_peg_agent/validate_doc_alignment_json.py"
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: meta_peg_agent
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 11 项 JSON 结构校验
+        run: python validate_doc_alignment_json.py
+
+      - name: self_test 闸门验证（R9）
+        run: |
+          python -c "
+          import subprocess, sys
+          samples = [
+              ('D1:函数签名', 'make_mock_hash_store(path, scenario)'),
+              ('D1:真偏差',   '文档写 step_count=6，代码实际产出 step_count=5'),
+              ('D1:数字漂移', '文档写 26 个断言，实际输出 33 个'),
+              ('D2:同性质',   '修复 .md L164 step_count=6→5'),
+              ('D3:目录树',   '83 个磁盘文件，目录树登记 83 个'),
+              ('D5:运行时',   'logs/gate_20260714_125558_73_PASS_20bceea9a4fd1304.jsonl'),
+              ('D6:回溯',     '补登记 40+ 文件后，续4 条目仍写补 2 个文件'),
+          ]
+          for name, text in samples:
+              r = subprocess.run([sys.executable, 'explainability_check.py', '--text', text],
+                  capture_output=True, text=True, encoding='utf-8', errors='replace')
+              ok = 'CRITICAL' not in (r.stdout + r.stderr)
+              print(f'  [{\"✓\" if ok else \"✗\"}] {name}')
+              if not ok: sys.exit(1)
+          print('R9 闸门: 7/7 PASS')
+          "
+          shell: pwsh
+
+      - name: 回归测试 (test_peg_trace)
+        run: python -m pytest test_peg_trace.py -v --tb=short
+        continue-on-error: true

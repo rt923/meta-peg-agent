@@ -1,0 +1,18 @@
+__pycache__/
+*.pyc
+*.bak
+traces/
+drafts/
+
+# Build products (D5: 不纳入版本控制)
+build/
+dist/
+*.egg-info/
+*.whl
+*.zip
+
+# Runtime logs (D5)
+logs/
+
+# Release packages (generated artifacts)
+registry_tools/release_package/
